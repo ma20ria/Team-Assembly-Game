@@ -46,6 +46,11 @@
     
     <div id="controls" class="mt-6 grid grid-cols-3 grid-rows-3 gap-2 w-48 md:hidden"><div class="col-start-2 row-start-1 flex"><button id="upBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▲</button></div><div class="col-start-1 row-start-2 flex"><button id="leftBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">◀</button></div><div class="col-start-3 row-start-2 flex"><button id="rightBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▶</button></div><div class="col-start-2 row-start-3 flex"><button id="downBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▼</button></div></div>
 
+    <!-- Footer -->
+    <div class="mt-8 text-center text-gray-500 text-sm">
+        <p>Created for Kids by Maria Manuel</p>
+    </div>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -68,7 +73,6 @@
         const OBSTACLE_COLOR_DARK = '#4d7c0f';
         const OBSTACLE_COLOR_LIGHT = '#65a30d';
 
-        // --- Updated Difficulty Settings ---
         const difficultySettings = {
             easy: { speed: 180, obstacles: 4 },
             medium: { speed: 150, obstacles: 10 },
