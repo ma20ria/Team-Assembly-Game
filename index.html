@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Assembly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            touch-action: none;
+        }
+        .pixel-shadow {
+            box-shadow: 5px 5px 0px 0px rgba(0,0,0,1);
+        }
+        .pixel-shadow-sm {
+            box-shadow: 3px 3px 0px 0px rgba(0,0,0,1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg mx-auto text-center">
+        <h1 class="text-4xl md:text-5xl font-bold text-yellow-400 mb-2" style="text-shadow: 2px 2px #000;">TEAM ASSEMBLY</h1>
+        <div class="bg-gray-800 p-4 rounded-lg pixel-shadow mb-4 flex justify-between items-center">
+            <div class="text-lg">TEAM: <span id="score">0</span> / 50</div>
+            <div class="text-lg">BEST: <span id="highScore">0</span></div>
+        </div>
+    </div>
+
+    <div class="relative w-full max-w-lg mx-auto aspect-square">
+        <canvas id="gameCanvas" class="border-4 border-gray-700 rounded-lg w-full h-full pixel-shadow"></canvas>
+        
+        <!-- Overlays -->
+        <div id="gameOverScreen" class="absolute inset-0 bg-black bg-opacity-70 flex-col items-center justify-center text-center hidden"><h2 class="text-5xl font-bold text-red-500">CHAIN BROKEN</h2><p class="text-xl mt-4">Your team had <span id="finalScore">0</span> people.</p><button id="restartButton" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md pixel-shadow-sm border-2 border-black active:translate-y-1 active:shadow-none">TRY AGAIN</button></div>
+        <div id="startScreen" class="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-center"><h2 class="text-3xl font-bold text-yellow-400">Select Difficulty</h2><p class="text-md mt-4 p-4">Gather 50 people to win! Avoid the bushes!</p>
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-4">
+                 <button data-difficulty="easy" class="difficulty-btn bg-green-500 hover:bg-green-600 text-gray-900 font-bold py-3 px-6 rounded-md pixel-shadow-sm border-2 border-black active:translate-y-1 active:shadow-none">EASY</button>
+                 <button data-difficulty="medium" class="difficulty-btn bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md pixel-shadow-sm border-2 border-black active:translate-y-1 active:shadow-none">MEDIUM</button>
+                 <button data-difficulty="hard" class="difficulty-btn bg-red-500 hover:bg-red-600 text-gray-900 font-bold py-3 px-6 rounded-md pixel-shadow-sm border-2 border-black active:translate-y-1 active:shadow-none">HARD</button>
+            </div>
+        </div>
+        <div id="winScreen" class="absolute inset-0 bg-black bg-opacity-80 flex-col items-center justify-center text-center hidden"><h2 class="text-5xl font-bold text-green-500">TEAM ASSEMBLED!</h2><p class="text-xl mt-4">You gathered everyone!</p><button id="playAgainButton" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-md pixel-shadow-sm border-2 border-black active:translate-y-1 active:shadow-none">PLAY AGAIN</button></div>
+    </div>
+    
+    <div id="controls" class="mt-6 grid grid-cols-3 grid-rows-3 gap-2 w-48 md:hidden"><div class="col-start-2 row-start-1 flex"><button id="upBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▲</button></div><div class="col-start-1 row-start-2 flex"><button id="leftBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">◀</button></div><div class="col-start-3 row-start-2 flex"><button id="rightBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▶</button></div><div class="col-start-2 row-start-3 flex"><button id="downBtn" class="bg-gray-700 text-yellow-400 p-4 rounded-md w-full h-full pixel-shadow-sm active:translate-y-1 active:shadow-none">▼</button></div></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const startScreen = document.getElementById('startScreen');
+        const winScreen = document.getElementById('winScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const restartButton = document.getElementById('restartButton');
+        const difficultyButtons = document.querySelectorAll('.difficulty-btn');
+        const playAgainButton = document.getElementById('playAgainButton');
+        const controls = document.getElementById('controls');
+
+        const GRID_SIZE = 20;
+        const TEAM_LIMIT = 50;
+        const PLAYER_COLOR = '#facc15';
+        const FOLLOWER_COLOR = '#18181b';
+        const TARGET_PERSON_COLOR = '#ef4444';
+        const OBSTACLE_COLOR_DARK = '#4d7c0f';
+        const OBSTACLE_COLOR_LIGHT = '#65a30d';
+
+        // --- Updated Difficulty Settings ---
+        const difficultySettings = {
+            easy: { speed: 180, obstacles: 4 },
+            medium: { speed: 150, obstacles: 10 },
+            hard: { speed: 120, obstacles: 8 }
+        };
+        let currentSettings = {};
+
+        let gameState = 'START';
+        let heroChain = [];
+        let targetPerson = {};
+        let obstacles = [];
+        let dx = GRID_SIZE, dy = 0;
+        let score = 0, highScore = 0;
+        let changingDirection = false;
+        let gameLoopTimeout;
+        let touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+
+        function resizeCanvas() {
+            const size = Math.min(canvas.parentElement.clientWidth, canvas.parentElement.clientHeight);
+            canvas.width = canvas.height = Math.floor(size / GRID_SIZE) * GRID_SIZE;
+            ctx.imageSmoothingEnabled = false;
+        }
+
+        function startGame() {
+            heroChain = [{ x: GRID_SIZE * 7, y: GRID_SIZE * 7 }];
+            dx = GRID_SIZE; dy = 0;
+            score = 1;
+            scoreElement.textContent = score;
+            changingDirection = false;
+            
+            gameOverScreen.classList.add('hidden');
+            startScreen.classList.add('hidden');
+            winScreen.classList.add('hidden');
+            controls.classList.remove('hidden');
+
+            createObstacles();
+            createTargetPerson();
+            gameState = 'GATHERING';
+            main();
+        }
+
+        function main() {
+            if (['GAME_OVER', 'WIN', 'START'].includes(gameState)) return;
+            gameLoopTimeout = setTimeout(() => {
+                changingDirection = false;
+                drawBackground();
+                updateGame();
+                main();
+            }, currentSettings.speed);
+        }
+
+        function updateGame() {
+            moveHeroChain();
+            drawObstacles();
+            drawTargetPerson();
+            drawHeroChain();
+
+            if (checkCollision()) {
+                endGame('DEFEATED');
+                return;
+            }
+            if (score >= TEAM_LIMIT) {
+                endGame('WIN');
+            }
+        }
+
+        function moveHeroChain() {
+            const head = { x: heroChain[0].x + dx, y: heroChain[0].y + dy };
+            heroChain.unshift(head);
+            if (head.x === targetPerson.x && head.y === targetPerson.y) {
+                score++;
+                scoreElement.textContent = score;
+                if (score < TEAM_LIMIT) {
+                    createTargetPerson();
+                }
+            } else {
+                heroChain.pop();
+            }
+        }
+        
+        function drawBackground() {
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            for(let i = 0; i < canvas.width; i += GRID_SIZE/2) {
+                for(let j = 0; j < canvas.height; j += GRID_SIZE/2) {
+                    if(Math.random() > 0.9) ctx.fillRect(i, j, 2, 2);
+                }
+            }
+        }
+        
+        function drawPerson(x, y, bodyColor, gender = 'man') {
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath();
+            ctx.arc(x + GRID_SIZE / 2, y + GRID_SIZE * 0.3, GRID_SIZE * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = bodyColor;
+            if (gender === 'woman') {
+                ctx.beginPath();
+                ctx.moveTo(x + GRID_SIZE * 0.2, y + GRID_SIZE * 0.5);
+                ctx.lineTo(x + GRID_SIZE * 0.8, y + GRID_SIZE * 0.5);
+                ctx.lineTo(x + GRID_SIZE / 2, y + GRID_SIZE);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                ctx.fillRect(x + GRID_SIZE * 0.2, y + GRID_SIZE * 0.5, GRID_SIZE * 0.6, GRID_SIZE * 0.5);
+            }
+        }
+
+        function drawHeroChain() {
+            heroChain.forEach((person, i) => {
+                drawPerson(person.x, person.y, i === 0 ? PLAYER_COLOR : FOLLOWER_COLOR, 'man');
+            });
+        }
+
+        function drawTargetPerson() {
+             if (score < TEAM_LIMIT) {
+                drawPerson(targetPerson.x, targetPerson.y, TARGET_PERSON_COLOR, 'woman');
+            }
+        }
+
+        function drawBush(x, y) {
+            const radius = GRID_SIZE / 2;
+            ctx.fillStyle = OBSTACLE_COLOR_DARK;
+            ctx.beginPath();
+            ctx.arc(x + radius * 0.7, y + radius * 0.7, radius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + radius * 1.5, y + radius * 0.8, radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + radius, y + radius * 1.4, radius * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = OBSTACLE_COLOR_LIGHT;
+            ctx.beginPath();
+            ctx.arc(x + radius * 0.8, y + radius * 0.9, radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+             ctx.beginPath();
+            ctx.arc(x + radius * 1.4, y + radius, radius * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+
+        function drawObstacles() {
+            obstacles.forEach(obs => {
+                drawBush(obs.x, obs.y);
+            });
+        }
+        
+        function createObstacles() {
+            obstacles = [];
+            for (let i = 0; i < currentSettings.obstacles; i++) {
+                let obsX, obsY;
+                while (true) {
+                    obsX = Math.floor(Math.random() * (canvas.width / GRID_SIZE)) * GRID_SIZE;
+                    obsY = Math.floor(Math.random() * (canvas.height / GRID_SIZE)) * GRID_SIZE;
+                    const isCollidingWithChain = heroChain.some(p => p.x === obsX && p.y === obsY);
+                    const isCollidingWithOtherObstacle = obstacles.some(o => o.x === obsX && o.y === obsY);
+                    const isNearStart = Math.abs(obsX - heroChain[0].x) < GRID_SIZE * 4 && Math.abs(obsY - heroChain[0].y) < GRID_SIZE * 4;
+
+                    if (!isCollidingWithChain && !isCollidingWithOtherObstacle && !isNearStart) break;
+                }
+                obstacles.push({ x: obsX, y: obsY });
+            }
+        }
+
+        function createTargetPerson() {
+            let personX, personY;
+            while (true) {
+                personX = Math.floor(Math.random() * (canvas.width / GRID_SIZE)) * GRID_SIZE;
+                personY = Math.floor(Math.random() * (canvas.height / GRID_SIZE)) * GRID_SIZE;
+                const isCollidingWithChain = heroChain.some(p => p.x === personX && p.y === personY);
+                const isCollidingWithObstacle = obstacles.some(o => o.x === personX && o.y === personY);
+                if (!isCollidingWithChain && !isCollidingWithObstacle) break;
+            }
+            targetPerson = { x: personX, y: personY };
+        }
+
+        function checkCollision() {
+            const head = heroChain[0];
+            for (let i = 1; i < heroChain.length; i++) {
+                if (heroChain[i].x === head.x && heroChain[i].y === head.y) return true;
+            }
+            const hitWall = head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height;
+            const hitObstacle = obstacles.some(o => o.x === head.x && o.y === head.y);
+            return hitWall || hitObstacle;
+        }
+
+        function endGame(outcome) {
+            clearTimeout(gameLoopTimeout);
+            if (outcome === 'DEFEATED') {
+                gameState = 'GAME_OVER';
+                finalScoreElement.textContent = score;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('teamAssemblyHighScore', highScore);
+                    highScoreElement.textContent = highScore;
+                }
+                gameOverScreen.classList.remove('hidden');
+                gameOverScreen.classList.add('flex');
+            } else if (outcome === 'WIN') {
+                gameState = 'WIN';
+                winScreen.classList.remove('hidden');
+                winScreen.classList.add('flex');
+            }
+        }
+        
+        function loadHighScore() {
+            const stored = localStorage.getItem('teamAssemblyHighScore');
+            if (stored) highScore = parseInt(stored, 10);
+            highScoreElement.textContent = highScore;
+        }
+
+        function changeDirection(newDx, newDy) {
+            if (changingDirection) return;
+            const goingUp = dy === -GRID_SIZE, goingDown = dy === GRID_SIZE;
+            const goingRight = dx === GRID_SIZE, goingLeft = dx === -GRID_SIZE;
+            if (newDx === -GRID_SIZE && !goingRight) { dx = -GRID_SIZE; dy = 0; changingDirection = true; }
+            if (newDx === GRID_SIZE && !goingLeft) { dx = GRID_SIZE; dy = 0; changingDirection = true; }
+            if (newDy === -GRID_SIZE && !goingDown) { dx = 0; dy = -GRID_SIZE; changingDirection = true; }
+            if (newDy === GRID_SIZE && !goingUp) { dx = 0; dy = GRID_SIZE; changingDirection = true; }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (gameState !== 'GATHERING') return;
+            if (e.key.startsWith("Arrow")) {
+                if (e.key === "ArrowLeft") changeDirection(-GRID_SIZE, 0);
+                if (e.key === "ArrowRight") changeDirection(GRID_SIZE, 0);
+                if (e.key === "ArrowUp") changeDirection(0, -GRID_SIZE);
+                if (e.key === "ArrowDown") changeDirection(0, GRID_SIZE);
+            }
+        });
+        
+        difficultyButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const difficulty = button.dataset.difficulty;
+                currentSettings = difficultySettings[difficulty];
+                startGame();
+            });
+        });
+        
+        restartButton.addEventListener('click', () => {
+            gameOverScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            startScreen.classList.add('flex');
+        });
+        playAgainButton.addEventListener('click', () => {
+            winScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            startScreen.classList.add('flex');
+        });
+        window.addEventListener('resize', () => { resizeCanvas(); if(gameState === 'START') drawBackground(); });
+        
+        document.getElementById('upBtn').addEventListener('click', () => changeDirection(0, -GRID_SIZE));
+        document.getElementById('downBtn').addEventListener('click', () => changeDirection(0, GRID_SIZE));
+        document.getElementById('leftBtn').addEventListener('click', () => changeDirection(-GRID_SIZE, 0));
+        document.getElementById('rightBtn').addEventListener('click', () => changeDirection(GRID_SIZE, 0));
+        
+        canvas.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }, { passive: true });
+        canvas.addEventListener('touchend', e => {
+            if (gameState !== 'GATHERING') return;
+            touchEndX = e.changedTouches[0].screenX; touchEndY = e.changedTouches[0].screenY;
+            const deltaX = touchEndX - touchStartX, deltaY = touchEndY - touchStartY;
+            if (Math.abs(deltaX) > Math.abs(deltaY)) changeDirection(deltaX > 0 ? GRID_SIZE : -GRID_SIZE, 0); 
+            else changeDirection(0, deltaY > 0 ? GRID_SIZE : -GRID_SIZE);
+        }, { passive: true });
+
+        window.onload = () => { loadHighScore(); resizeCanvas(); drawBackground(); };
+    </script>
+</body>
+</html>
